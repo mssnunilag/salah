@@ -210,6 +210,35 @@ export function computePrayerTimes(options: ComputeOptions): PrayerTimes {
   };
 }
 
+export interface NextPrayer {
+  readonly prayer: Exclude<PrayerName, "sunrise">;
+  readonly minutesUntil: Minutes;
+}
+
+const MINUTES_PER_DAY = 24 * 60;
+
+/**
+ * The next prayer after `nowMinutes`, and how many minutes away it is.
+ *
+ * Sunrise is skipped because it opens no prayer window, so counting down to
+ * it would tell the student nothing they can act on. The comparison is
+ * strict, so at the exact minute a prayer begins the countdown has already
+ * moved on to the one after it.
+ *
+ * Once Isha has passed there is no later prayer today, so the answer is
+ * tomorrow's Fajr. We express that as minutes from now rather than as a Date
+ * so the rollover needs no calendar arithmetic and stays inside the
+ * minutes-since-midnight convention.
+ */
+export function nextPrayer(times: PrayerTimes, nowMinutes: Minutes): NextPrayer {
+  const now = wrap(nowMinutes, MINUTES_PER_DAY);
+  const upcoming: readonly NextPrayer["prayer"][] = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
+  for (const prayer of upcoming) {
+    if (times[prayer] > now) return { prayer, minutesUntil: times[prayer] - now };
+  }
+  return { prayer: "fajr", minutesUntil: times.fajr + MINUTES_PER_DAY - now };
+}
+
 /** "14:32" from 872. Zero-padded so a column of times lines up. */
 export function formatMinutes(minutes: Minutes): string {
   const normalised = wrap(Math.round(minutes), 24 * 60);

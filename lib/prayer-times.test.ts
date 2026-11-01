@@ -6,6 +6,7 @@ import {
   formatMinutes,
   formatMinutes12Hour,
   julianDay,
+  nextPrayer,
   parseTimeOfDay,
 } from "./prayer-times";
 
@@ -21,6 +22,17 @@ describe("julianDay", () => {
     // Without the `b` term this comes out exactly 13 days wrong, which is
     // the failure mode worth pinning down.
     expect(julianDay(1900, 1, 1)).toBe(2415020.5);
+  });
+});
+
+describe("nextPrayer", () => {
+  it("rolls over to tomorrow's Fajr once Isha has passed", () => {
+    const t = onCampus("2026-10-31");
+    const lateEvening = t.isha + 30;
+    expect(nextPrayer(t, lateEvening)).toEqual({
+      prayer: "fajr",
+      minutesUntil: t.fajr + 24 * 60 - lateEvening,
+    });
   });
 });
 

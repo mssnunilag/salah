@@ -11,6 +11,7 @@ import {
 import { type Lecture, type Weekday, WEEKDAYS, analyseDay } from "@/lib/timetable";
 import { loadLectures, saveLectures } from "@/lib/storage";
 import { PrayerTable } from "@/components/PrayerTable";
+import { NextPrayerCountdown } from "@/components/NextPrayerCountdown";
 import { ConflictList } from "@/components/ConflictList";
 import campus from "@/data/campus-spaces.json";
 
@@ -104,6 +105,7 @@ export default function Home() {
             </select>
           </label>
         </div>
+        <NextPrayerCountdown times={times} />
         <PrayerTable times={times} />
       </section>
 
