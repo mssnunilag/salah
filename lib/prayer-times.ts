@@ -31,20 +31,33 @@ export type PrayerTimes = Record<PrayerName, Minutes>;
  * settled on different numbers. Nigeria has no single official body, so we
  * default to Muslim World League and let the student choose.
  */
+export type IshaRule =
+  /** Degrees the sun sits below the horizon at the start of Isha. */
+  | { readonly kind: "angle"; readonly degrees: number }
+  /** Minutes after Maghrib, with a separate interval for Ramadan. Being a
+   *  fixed interval rather than an angle, it follows Maghrib as the sun
+   *  moves, instead of tracking the twilight. */
+  | { readonly kind: "interval"; readonly minutes: number; readonly ramadanMinutes: number };
+
 export interface CalculationMethod {
   readonly id: string;
   readonly label: string;
   /** Degrees the sun sits below the horizon at the start of Fajr. */
   readonly fajrAngle: number;
-  /** Degrees the sun sits below the horizon at the start of Isha. */
-  readonly ishaAngle: number;
+  readonly isha: IshaRule;
 }
 
 export const CALCULATION_METHODS: readonly CalculationMethod[] = [
-  { id: "mwl", label: "Muslim World League", fajrAngle: 18, ishaAngle: 17 },
-  { id: "egyptian", label: "Egyptian General Authority", fajrAngle: 19.5, ishaAngle: 17.5 },
-  { id: "karachi", label: "University of Islamic Sciences, Karachi", fajrAngle: 18, ishaAngle: 18 },
-  { id: "isna", label: "Islamic Society of North America", fajrAngle: 15, ishaAngle: 15 },
+  { id: "mwl", label: "Muslim World League", fajrAngle: 18, isha: { kind: "angle", degrees: 17 } },
+  { id: "egyptian", label: "Egyptian General Authority", fajrAngle: 19.5, isha: { kind: "angle", degrees: 17.5 } },
+  { id: "karachi", label: "University of Islamic Sciences, Karachi", fajrAngle: 18, isha: { kind: "angle", degrees: 18 } },
+  { id: "isna", label: "Islamic Society of North America", fajrAngle: 15, isha: { kind: "angle", degrees: 15 } },
+  {
+    id: "umm-al-qura",
+    label: "Umm al-Qura University, Makkah",
+    fajrAngle: 18.5,
+    isha: { kind: "interval", minutes: 90, ramadanMinutes: 120 },
+  },
 ];
 
 /**
@@ -163,6 +176,10 @@ export interface ComputeOptions {
   readonly location?: Location;
   readonly method?: CalculationMethod;
   readonly asrMethod?: AsrMethod;
+  /** Only read by methods whose Isha is an interval; the caller decides
+   *  whether the date falls in Ramadan, so this module stays free of the
+   *  Hijri calendar. */
+  readonly ramadan?: boolean;
 }
 
 /**
@@ -178,6 +195,7 @@ export function computePrayerTimes(options: ComputeOptions): PrayerTimes {
   const method = options.method ?? CALCULATION_METHODS[0];
   const asrMethod = options.asrMethod ?? "standard";
   const { date } = options;
+  const ramadan = options.ramadan ?? false;
 
   const jd = julianDay(date.getFullYear(), date.getMonth() + 1, date.getDate());
   const { declination, equationOfTime } = solarPosition(jd);
@@ -200,13 +218,19 @@ export function computePrayerTimes(options: ComputeOptions): PrayerTimes {
   // Negated: the sun is still above the horizon at Asr.
   const asrOffset = hourAngle(-asrAltitude, location.latitude, declination);
 
+  const maghribHours = dhuhrHours + horizon;
+  const ishaHours =
+    method.isha.kind === "angle"
+      ? dhuhrHours + twilight(method.isha.degrees)
+      : maghribHours + (ramadan ? method.isha.ramadanMinutes : method.isha.minutes) / 60;
+
   return {
     fajr: toMinutes(dhuhrHours - twilight(method.fajrAngle)),
     sunrise: toMinutes(dhuhrHours - horizon),
     dhuhr: toMinutes(dhuhrHours),
     asr: toMinutes(dhuhrHours + asrOffset),
-    maghrib: toMinutes(dhuhrHours + horizon),
-    isha: toMinutes(dhuhrHours + twilight(method.ishaAngle)),
+    maghrib: toMinutes(maghribHours),
+    isha: toMinutes(ishaHours),
   };
 }
 

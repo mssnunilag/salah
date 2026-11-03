@@ -82,6 +82,30 @@ describe("computePrayerTimes at UNILAG", () => {
   });
 });
 
+describe("Isha defined by an interval after Maghrib", () => {
+  const date = new Date("2026-10-31T00:00:00");
+  const ummAlQura = CALCULATION_METHODS.find((m) => m.id === "umm-al-qura")!;
+
+  it("puts Isha 90 minutes after Maghrib outside Ramadan", () => {
+    const t = computePrayerTimes({ date, method: ummAlQura });
+    // Rounding to whole minutes can move the difference by one.
+    expect(Math.abs(t.isha - t.maghrib - 90)).toBeLessThanOrEqual(1);
+  });
+
+  it("puts Isha 120 minutes after Maghrib in Ramadan", () => {
+    const t = computePrayerTimes({ date, method: ummAlQura, ramadan: true });
+    expect(Math.abs(t.isha - t.maghrib - 120)).toBeLessThanOrEqual(1);
+  });
+
+  it("leaves an angle-based method's Isha alone when Ramadan is set", () => {
+    // Only interval methods read the flag; the twilight methods must not shift.
+    const mwl = CALCULATION_METHODS.find((m) => m.id === "mwl")!;
+    const plain = computePrayerTimes({ date, method: mwl });
+    const inRamadan = computePrayerTimes({ date, method: mwl, ramadan: true });
+    expect(inRamadan.isha).toBe(plain.isha);
+  });
+});
+
 describe("formatting", () => {
   it("zero-pads so a column lines up", () => {
     expect(formatMinutes(5 * 60 + 7)).toBe("05:07");
